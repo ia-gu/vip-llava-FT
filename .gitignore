@@ -17,6 +17,7 @@ dist
 *weights*
 *result*
 *openai*
+
 # Editor
 .idea
 *.swp
@@ -44,3 +45,7 @@ tmp*
 dataset
 *chtc*
 *debug*
+*wandb*
+*mvtec_result*
+*predict_*.py
+scripts/

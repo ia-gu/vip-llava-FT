@@ -38,7 +38,7 @@ from llava.mm_utils import tokenizer_image_token
 from PIL import Image
 import random
 from llava.visual_prompt_organizer import vip_processor, visual_prompt_config
-
+import wandb
 
 local_rank = None
 
@@ -87,6 +87,10 @@ class TrainingArguments(transformers.TrainingArguments):
     lora_bias: str = "none"
     mm_projector_lr: Optional[float] = None
     group_by_modality_length: bool = field(default=False)
+    wandb_project: str = 'debug'
+    wandb_entity: str = 'ia-gu'
+    wandb_run_name: str = 'debug'
+
 
 def maybe_zero_3(param, ignore_status=False, name=None):
     from deepspeed import zero
@@ -243,22 +247,18 @@ def _tokenize_fn(strings: Sequence[str],
 
 def _mask_targets(target, tokenized_lens, speakers):
     # cur_idx = 0
-    print()
     cur_idx = tokenized_lens[0]
     tokenized_lens = tokenized_lens[1:]
     target[:cur_idx] = IGNORE_INDEX
     for tokenized_len, speaker in zip(tokenized_lens, speakers):
         if speaker == "human":
-            # target[cur_idx+2:cur_idx + tokenized_len] = IGNORE_INDEX
             target[cur_idx+2:cur_idx + tokenized_len] = IGNORE_INDEX
         cur_idx += tokenized_len
 
 def _add_speaker_and_signal(header, source, get_conversation=True):
     """Add speaker and start/end signal on each round."""
     BEGIN_SIGNAL = "### "
-    # BEGIN_SIGNAL = " "
     END_SIGNAL = "\n"
-    # END_SIGNAL = " "
     conversation = header
     for sentence in source:
         from_str = sentence["from"]
@@ -686,11 +686,11 @@ class LazySupervisedDataset(Dataset):
             # image does not exist in the data, but the model is multimodal
             crop_size = self.data_args.image_processor.crop_size
             data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
-        try:
-            # print(f'decoded input: {self.tokenizer.decode(data_dict["input_ids"])}')
-            print(f'decoded label: {self.tokenizer.decode(data_dict["labels"])}')
-        except:
-            pass
+        # try:
+        #     # print(f'decoded input: {self.tokenizer.decode(data_dict["input_ids"])}')
+        #     print(f'decoded label: {self.tokenizer.decode(data_dict["labels"])}')
+        # except:
+        #     pass
         return data_dict
 
 
@@ -747,6 +747,9 @@ def train():
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     local_rank = training_args.local_rank
+    if local_rank == 0:
+        wandb.init(project=training_args.wandb_project, entity=training_args.wandb_entity, name=training_args.wandb_run_name)
+
     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
 
     bnb_model_from_pretrained_args = {}
@@ -913,8 +916,6 @@ def train():
 
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=data_args)
-    # trainerはtransformers.Trainerのサブクラス
-    # でもinitに書き加えた処理が反映されない
     trainer = LLaVATrainer(model=model,
                     tokenizer=tokenizer,
                     args=training_args,
@@ -923,7 +924,6 @@ def train():
         trainer.train(resume_from_checkpoint=True)
     else:
         # running the default implementation
-        # print(tokenizer.decode({0}))
         trainer.train()
     trainer.save_state()
 

@@ -6,15 +6,12 @@ from llava.model.builder import load_pretrained_model
 from llava.utils import disable_torch_init
 from llava.mm_utils import tokenizer_image_token, KeywordsStoppingCriteria
 
+from PIL import Image
+
 import requests
 from io import BytesIO
-from cog import BasePredictor, Input, Path, ConcatenateIterator
 
-import os
-import csv
-import glob
-from PIL import Image
-from datetime import datetime
+from cog import BasePredictor, Input, Path, ConcatenateIterator
 
 class Predictor(BasePredictor):
     def setup(self, weight_path) -> None:
@@ -65,6 +62,7 @@ class Predictor(BasePredictor):
                 use_cache=True,
                 stopping_criteria=[stopping_criteria]
             )
+            print(output_texts.shape)
             # Process and yield each text output
             prepend_space = False
             for new_text in output_texts:
@@ -95,53 +93,12 @@ def load_image(image_file):
 
 
 if __name__ == "__main__":
-    # Define
     predictor = Predictor()
-    data_paths = glob.glob('/data/mvtec_test_for_icl/*/*/*')
-    weight_path = ["checkpoints/rename_view_scraped_whole_bbox/vip-llava-7b/20240419-201050", 'checkpoints/rename_view_scraped_no_bias/vip-llava-7b/20240419-204520', 'checkpoints/rename_full_scraped_whole_bbox/vip-llava-7b/20240420-024724', 'checkpoints/rename_full_scraped_no_bias/vip-llava-7b/20240420-044328']
-    output_path = ['./mvtec_result/rename_view_scraped_whole_bbox', './mvtec_result/rename_view_scraped_no_bias', './mvtec_result/rename_full_scraped_whole_bbox', './mvtec_result/rename_full_scraped_no_bias']
+    weight_path = "/home/ueno/vip-llava/checkpoints/rename_view_2e-5/vip-llava-7b/20240421-004223"
+    imagepath = "/data/mvtec/bottle/test/good/000.png"
+    category = "bottle"
+    predictor.setup(weight_path=weight_path)
 
-    for idx in range(len(weight_path)):
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        os.makedirs(os.path.join(output_path[idx], timestamp),  exist_ok=True)
-
-        # Setup
-        with open(os.path.join(output_path[idx], timestamp, 'output_full_text.csv'), 'w') as f: pass
-        predictor.setup(weight_path=weight_path[idx])
-        base_input_text = "This is an image of {category}. Does this {category} in the image have any defects? If yes, please provide the bounding box coordinate of the region where the defect is located."
-        correct = 0; total = 0
-        tmp_category = data_paths[0].split('/')[3]
-        tmp_mode = data_paths[0].split('/')[4]
-
-        # Predict
-        for data_path in data_paths:
-            input_text = base_input_text.format(category=data_path.split('/')[-3])
-            # RUN
-            for i, text in enumerate(predictor.predict(image=data_path, prompt=input_text, temperature=0.2)):
-                # Output category, mode, and accuracy
-                if tmp_mode != data_path.split('/')[4]:
-                    with open(os.path.join(output_path[idx], timestamp, 'output_full_text.csv'), 'a') as f:
-                        writer = csv.writer(f)
-                        writer.writerow([tmp_category, tmp_mode, f'{correct}/{total}'])
-                        correct = 0; total = 0; tmp_category = data_path.split('/')[3]; tmp_mode = data_path.split('/')[4]
-
-                print(data_path, end=':')
-                print(text.split('ASSISTANT: ')[-1])
-                if text.split('ASSISTANT: ')[-1] == 'None.' and data_path.split('/')[4] == 'good':
-                    correct += 1
-                    total += 1
-                    true_or_false = True
-                elif text.split('ASSISTANT: ')[-1] != 'None.' and data_path.split('/')[4] != 'good':
-                    correct += 1
-                    total += 1
-                    true_or_false = True
-                else:
-                    total += 1
-                    true_or_false = False
-                # Output path, answer, and true or false
-                with open(os.path.join(output_path[idx], timestamp, 'output_full_text.csv'), 'a') as f:
-                    writer = csv.writer(f)
-                    writer.writerow([data_path, text.split('ASSISTANT: ')[-1], true_or_false])
-        with open(os.path.join(output_path[idx], timestamp, 'output_full_text.csv'), 'a') as f:
-            writer = csv.writer(f)
-            writer.writerow([data_path.split('/')[3], data_path.split('/')[4], f'{correct}/{total}'])
+    input_text = f"This is an image of {category}. Does this {category} in the image have any defects? If yes, please provide the bounding box coordinate of the region where the defect is located."
+    for i, text in enumerate(predictor.predict(image=imagepath, prompt=input_text, temperature=1e-10)):
+        print(f"Prediction {i}: {text}")
