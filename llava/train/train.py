@@ -90,6 +90,7 @@ class TrainingArguments(transformers.TrainingArguments):
     wandb_project: str = 'debug'
     wandb_entity: str = 'ia-gu'
     wandb_run_name: str = 'debug'
+    save_epochs: int = 100
 
 
 def maybe_zero_3(param, ignore_status=False, name=None):

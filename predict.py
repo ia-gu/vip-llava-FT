@@ -94,11 +94,12 @@ def load_image(image_file):
 
 if __name__ == "__main__":
     predictor = Predictor()
-    weight_path = "/home/ueno/vip-llava/checkpoints/rename_view_2e-5/vip-llava-7b/20240421-004223"
-    imagepath = "/data/mvtec/bottle/test/good/000.png"
+    weight_path = "/home/ueno/vip-llava/checkpoints/rename_full_no_bias/2e-5/30epoch/vip-llava-7b/20240508-153414"
+    imagepath = "/home/ueno/InMeMo/pascal-5i/mvtec/JPEGImages/0.jpg"
     category = "bottle"
     predictor.setup(weight_path=weight_path)
 
-    input_text = f"This is an image of {category}. Does this {category} in the image have any defects? If yes, please provide the bounding box coordinate of the region where the defect is located."
+    input_text = f"<image>\nThis is an image of {category}. Does this {category} in the image have any defects? If yes, please provide the bounding box coordinate of the region where the defect is located."
+    # input_text = f"This is an image of {category}. Does this {category} in the image have any defects? If yes, please provide the bounding box coordinate of the region where the defect is located."
     for i, text in enumerate(predictor.predict(image=imagepath, prompt=input_text, temperature=1e-10)):
         print(f"Prediction {i}: {text}")
